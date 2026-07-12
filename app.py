@@ -195,6 +195,11 @@ def extract_youtube():
 
     if not info or info.get('error'):
         message = info.get('error') if info else 'Não foi possível extrair informações do vídeo. Verifique a URL.'
+        if 'autenticação' in message.lower() or 'cookies' in message.lower():
+            message = (
+                'Este vídeo requer autenticação ou cookies do YouTube. ' 
+                'No ambiente Vercel, você precisa definir YTDLP_COOKIES_PATH ou usar outro vídeo.'
+            )
         return jsonify({
             'success': False,
             'message': message

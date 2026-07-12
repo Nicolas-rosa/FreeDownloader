@@ -9,6 +9,7 @@ Módulo responsável por:
 - Retornar URL de stream ou lista de opções
 """
 
+import os
 import yt_dlp
 import json
 from typing import Dict, List, Optional, Tuple
@@ -37,7 +38,16 @@ class YouTubeStreamExtractor:
             'nocheckcertificate': True,
             'source_address': '0.0.0.0',
             'retries': 3,
+            'cachedir': False,
         }
+
+        cookies_path = os.environ.get('YTDLP_COOKIES_PATH')
+        cookies_browser = os.environ.get('YTDLP_COOKIES_FROM_BROWSER')
+        if cookies_path:
+            opts['cookiefile'] = cookies_path
+        elif cookies_browser:
+            opts['cookies_from_browser'] = cookies_browser
+
         if extra:
             opts.update(extra)
         return opts
@@ -66,7 +76,13 @@ class YouTubeStreamExtractor:
                     'prefer_insecure': True,
                 })
             except Exception as second_exc:
-                return {'error': str(second_exc)}
+                error_message = str(second_exc)
+                if 'sign in to confirm' in error_message.lower() or 'cookies' in error_message.lower():
+                    error_message = (
+                        'O YouTube exige autenticação/cookies para este vídeo. ' 
+                        'Configure YTDLP_COOKIES_PATH ou use outro vídeo.'
+                    )
+                return {'error': error_message}
 
         return {
             'id': info.get('id'),
