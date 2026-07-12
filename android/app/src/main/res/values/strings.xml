@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FreeDownloader</string>
+    <string name="default_server_url">https://seu-projeto.vercel.app/</string>
+    <string name="setup_title">Configurar servidor</string>
+    <string name="setup_heading">Conecte seu FreeDownloader</string>
+    <string name="setup_description">Informe a URL HTTPS do seu site publicado no Vercel. O app usa esse servidor para processar e entregar os downloads.</string>
+    <string name="server_url_hint">https://seu-projeto.vercel.app</string>
+    <string name="save_and_continue">Salvar e continuar</string>
+    <string name="invalid_server_url">Informe uma URL HTTPS válida.</string>
+    <string name="change_server">Alterar servidor</string>
+    <string name="download_description">Download iniciado pelo FreeDownloader</string>
+    <string name="download_started">Download iniciado. Acompanhe pela notificação.</string>
+    <string name="download_failed">Não foi possível iniciar o download.</string>
+    <string name="unable_to_open_link">Não foi possível abrir este link.</string>
+</resources>

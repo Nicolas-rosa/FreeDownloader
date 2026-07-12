@@ -31,3 +31,9 @@ Thumbs.db
 
 # Deployment artifacts
 *.deb
+
+# Android local/build artifacts
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/
