@@ -46,9 +46,30 @@ class YouTubeStreamExtractor:
             },
         }
 
+        self._cookie_path: Optional[str] = None
         self._cookies_loaded = False
         self._cookies: List[Tuple[int, str]] = []
         self._cookie_index = 0
+
+        # Carrega cookie do YouTube via YTDLP_COOKIES_B64
+        cookie_b64 = os.environ.get('YTDLP_COOKIES_B64')
+        if cookie_b64:
+            self._logger.info('[cookies] YTDLP_COOKIES_B64 encontrada.')
+            try:
+                cookie_content = base64.b64decode(cookie_b64, validate=True)
+                if self._valid_cookie_content(cookie_content):
+                    cookie_path = '/tmp/cookies.txt'
+                    if not os.path.exists(cookie_path):
+                        with open(cookie_path, 'wb') as f:
+                            f.write(cookie_content)
+                        os.chmod(cookie_path, 0o600)
+                    self._cookie_path = cookie_path
+                    self.ydl_opts['cookiefile'] = cookie_path
+                    self._logger.info('[cookies] Arquivo validado com sucesso (%d bytes).', len(cookie_content))
+                else:
+                    self._logger.warning('[cookies] YTDLP_COOKIES_B64 ignorada: conteúdo inválido.')
+            except (ValueError, OSError) as exc:
+                self._logger.warning('[cookies] YTDLP_COOKIES_B64 ignorada: %s', exc)
 
         self._pot_provider_url = os.environ.get('YTDLP_POT_PROVIDER_URL', '').strip() or None
         self._pot_provider_secret = os.environ.get('YTDLP_POT_PROVIDER_SECRET', '') or None

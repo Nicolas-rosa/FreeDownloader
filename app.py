@@ -196,7 +196,13 @@ def extract_youtube():
     if not info or info.get('error'):
         message = info.get('error') if info else 'Não foi possível extrair informações do vídeo. Verifique a URL.'
         lower_message = message.lower()
-        if 'cookies' in lower_message or 'autenticação' in lower_message or 'sign in to confirm' in lower_message:
+        # Detecta bot-check separadamente
+        bot_signals = ('sign in to confirm', 'cookies', 'botguard', 'po token', 'verify you are human')
+        is_bot_check = any(signal in lower_message for signal in bot_signals)
+        if is_bot_check:
+            app.logger.warning('[bot-check] YouTube bloqueou a requisição: %s', message)
+            message = 'O YouTube está solicitando verificação de segurança. Tente novamente em alguns minutos ou use outro vídeo.'
+        elif 'cookies' in lower_message or 'autenticação' in lower_message:
             if environ.get('YTDLP_COOKIES_B64'):
                 message = 'Os cookies do YouTube parecem expirados ou inválidos. Atualize YTDLP_COOKIES_B64 no Vercel.'
             else:
