@@ -43,10 +43,14 @@ class YouTubeStreamExtractor:
 
         cookies_path = os.environ.get('YTDLP_COOKIES_PATH')
         cookies_browser = os.environ.get('YTDLP_COOKIES_FROM_BROWSER')
+        proxy = os.environ.get('YTDLP_PROXY')
         if cookies_path:
             opts['cookiefile'] = cookies_path
         elif cookies_browser:
             opts['cookies_from_browser'] = cookies_browser
+
+        if proxy:
+            opts['proxy'] = proxy
 
         if extra:
             opts.update(extra)

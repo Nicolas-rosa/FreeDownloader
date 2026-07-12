@@ -20,5 +20,11 @@ Notas importantes para aprovação no Google AdSense:
 - Evite páginas “thin content”: adicione descrição, ajuda e conteúdo editorial para cada página.
 - Antes de publicar, substitua o e-mail padrão de contato e preencha as informações reais do responsável pelo site.
 
+Depuração de YouTube no deploy:
+- Para vídeos que exigem login, use cookies autenticados do navegador.
+- Exporte um `cookies.txt` da conta Google logada e configure em Vercel como `YTDLP_COOKIES_PATH`.
+- Não suba o arquivo de cookies para o Git; use variável de ambiente ou storage seguro.
+- Para proxy residencial, configure `YTDLP_PROXY` no Vercel com algo como `http://user:pass@host:port`.
+
 Observações legais:
 - Este projeto não auxilia em burlar proteções ou TOS de terceiros. Use apenas arquivos que você possui direitos.
