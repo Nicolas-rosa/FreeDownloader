@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}FreeDownloader — arquivos MP3 e MP4{% endblock %}
+{% block content %}
+<main>
+  <section class="hero-section">
+    <div class="hero-orb orb-one"></div><div class="hero-orb orb-two"></div>
+    <div class="container hero-content text-center">
+      <span class="eyebrow">ARQUIVOS PRÓPRIOS E AUTORIZADOS</span>
+      <h1>Seu arquivo, pronto para <span>baixar.</span></h1>
+      <p class="hero-copy">Cole uma URL direta de um arquivo MP3 ou MP4 que você criou, possui ou tem permissão explícita para baixar. Ou envie um link do YouTube de seu próprio vídeo.</p>
+      <div class="download-panel text-start">
+        {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="alert alert-{{ category }}" role="alert">{{ message }}</div>{% endfor %}{% endwith %}
+        
+        <!-- Abas de modo: URL direta vs YouTube -->
+        <ul class="nav nav-tabs download-tabs mb-3" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="direct-tab" data-bs-toggle="tab" data-bs-target="#direct-form" type="button" role="tab" aria-controls="direct-form" aria-selected="true">URL Direta</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="youtube-tab" data-bs-toggle="tab" data-bs-target="#youtube-form" type="button" role="tab" aria-controls="youtube-form" aria-selected="false">YouTube</button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- Formulário para URL direta -->
+          <div class="tab-pane fade show active" id="direct-form" role="tabpanel" aria-labelledby="direct-tab">
+            <form method="post" action="{{ url_for('download') }}">
+              <label for="url" class="form-label">URL direta do arquivo</label>
+              <div class="url-field"><span aria-hidden="true">↗</span><input id="url" type="url" name="url" placeholder="https://cdn.exemplo.com/meu-arquivo.mp4" autocomplete="url" required><button type="submit">Baixar <span aria-hidden="true">↓</span></button></div>
+              <label class="rights-check" for="confirm"><input type="checkbox" name="confirm" id="confirm" required><span>Confirmo que sou titular dos direitos ou possuo autorização para baixar este arquivo.</span></label>
+            </form>
+            <p class="form-note">Formatos aceitos: MP3 e MP4 · Limite de 200 MB · Aceita URL direta do arquivo.</p>
+          </div>
+
+          <!-- Formulário para YouTube -->
+          <div class="tab-pane fade" id="youtube-form" role="tabpanel" aria-labelledby="youtube-tab">
+            <form id="youtube-form-element" method="post" action="{{ url_for('download_youtube') }}">
+              <label for="youtube-url" class="form-label">URL do vídeo no YouTube</label>
+              <div class="url-field"><span aria-hidden="true">▶</span><input id="youtube-url" type="url" name="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="url" required pattern="https?://(www\.)?youtu(be\.com|\.be)/.*"><button type="button" id="extract-btn" class="btn-extract">Analisar <span aria-hidden="true">⚙</span></button></div>
+              
+              <!-- Spinner de carregamento -->
+              <div id="extract-loading" class="extract-loading d-none" role="status">
+                <div class="spinner-border spinner-border-sm" aria-label="Carregando"></div>
+                <span>Analisando vídeo...</span>
+              </div>
+
+              <!-- Resultados da extração -->
+              <div id="extract-results" class="extract-results d-none">
+                <div class="video-info mb-3">
+                  <p><strong id="video-title"></strong></p>
+                  <small id="video-meta" class="text-muted"></small>
+                </div>
+
+                <div class="format-selection mb-3">
+                  <label for="format-select" class="form-label">Selecione a qualidade</label>
+                  <select id="format-select" name="format_id" class="form-select" required>
+                    <option value="">Carregando formatos...</option>
+                  </select>
+                  <input type="hidden" name="type" id="format-type" value="">
+                </div>
+
+                <label class="rights-check" for="confirm-youtube"><input type="checkbox" name="confirm" id="confirm-youtube" required><span>Confirmo que este é meu vídeo ou tenho autorização para fazer o download.</span></label>
+
+                <button type="submit" class="btn btn-primary">Baixar <span aria-hidden="true">↓</span></button>
+              </div>
+
+              <p class="form-note mt-3">Apenas vídeos seus ou autorizados · Streaming via URL resolver de adapative manifest · Limite de 200 MB</p>
+            </form>
+          </div>
+        </div>
+
+        <p class="form-note mt-2">Formatos: MP3 (áudio) e MP4 (vídeo) · Sem registro necessário · Download seguro</p>
+      </div>
+      <div class="trust-row"><span>✓ Sem cadastro</span><span>✓ URL direta ou YouTube</span><span>✓ Download seguro</span></div>
+    </div>
+  </section>
+  <section id="como-funciona" class="how-section container">
+    <div class="section-heading"><span class="eyebrow">SIMPLES E TRANSPARENTE</span><h2>Como funciona</h2><p>Um processo objetivo para recuperar seus próprios arquivos hospedados na web ou seus vídeos do YouTube.</p></div>
+    <div class="steps-grid">
+      <article><b>01</b><h3>Cole a URL</h3><p>Informe o link direto para o arquivo MP3/MP4 ou a URL do seu vídeo do YouTube.</p></article>
+      <article><b>02</b><h3>Selecione a qualidade</h3><p>Para YouTube, escolha entre formatos de áudio (MP3) ou vídeo (MP4) em várias qualidades.</p></article>
+      <article><b>03</b><h3>Confirme seus direitos</h3><p>Use somente conteúdo seu ou devidamente licenciado — você confirma ao fazer download.</p></article>
+      <article><b>04</b><h3>Salve o arquivo</h3><p>O download é iniciado diretamente no seu navegador com o nome original do arquivo.</p></article>
+    </div>
+  </section>
+  <section class="responsibility-section"><div class="container responsibility-card"><div class="notice-icon">§</div><div><h2>Uso responsável começa com você.</h2><p>Esta ferramenta aceita URLs diretas para arquivos públicos e URLs de vídeos do YouTube. Não contorna DRM, não extrai conteúdo de plataformas restritas e não deve ser usada para copiar obras de terceiros sem autorização. O streaming é feito através de URLs públicas de manifesto adaptativo (DASH) — sem burlar proteções.</p></div><a href="{{ url_for('terms') }}">Ler os termos →</a></div></section>
+</main>
+
+<!-- Script para extrair informações do YouTube -->
+<script>
+document.getElementById('extract-btn').addEventListener('click', async function() {
+  const url = document.getElementById('youtube-url').value.trim();
+  const loading = document.getElementById('extract-loading');
+  const results = document.getElementById('extract-results');
+
+  if (!url) {
+    alert('Por favor informe uma URL do YouTube válida.');
+    return;
+  }
+
+  // Mostrar loading, esconder resultados anteriores
+  loading.classList.remove('d-none');
+  results.classList.add('d-none');
+
+  try {
+    const formData = new FormData();
+    formData.append('url', url);
+
+    const response = await fetch('{{ url_for("extract_youtube") }}', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      alert('Erro: ' + data.message);
+      loading.classList.add('d-none');
+      return;
+    }
+
+    // Processar resposta
+    const info = data.video_info;
+    document.getElementById('video-title').textContent = info.title;
+    
+    const duration = Math.floor(info.duration / 60);
+    document.getElementById('video-meta').textContent = `de ${info.uploader} · duração: ${duration}m`;
+
+    // Popular seletor de formatos
+    const selectEl = document.getElementById('format-select');
+    selectEl.innerHTML = '';
+
+    // Agrupar por tipo (áudio primeiro, depois vídeo)
+    const audioFormats = info.formats.filter(f => f.type === 'audio');
+    const videoFormats = info.formats.filter(f => f.type === 'video');
+
+    if (audioFormats.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = '🎵 Áudio (MP3)';
+      audioFormats.forEach(fmt => {
+        const opt = document.createElement('option');
+        opt.value = fmt.format_id;
+        opt.textContent = `${fmt.quality} - ${fmt.format_note}${fmt.filesize ? ' (~' + Math.round(fmt.filesize / 1024 / 1024) + 'MB)' : ''}`;
+        opt.dataset.type = 'audio';
+        group.appendChild(opt);
+      });
+      selectEl.appendChild(group);
+    }
+
+    if (videoFormats.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = '🎬 Vídeo (MP4)';
+      videoFormats.forEach(fmt => {
+        const opt = document.createElement('option');
+        opt.value = fmt.format_id;
+        opt.textContent = `${fmt.quality} - ${fmt.format_note}${fmt.filesize ? ' (~' + Math.round(fmt.filesize / 1024 / 1024) + 'MB)' : ''}`;
+        opt.dataset.type = 'video';
+        group.appendChild(opt);
+      });
+      selectEl.appendChild(group);
+    }
+
+    // Atualizar tipo quando selecão muda
+    if (!selectEl.dataset.listenerAdded) {
+      selectEl.addEventListener('change', function() {
+        const selected = selectEl.options[selectEl.selectedIndex];
+        document.getElementById('format-type').value = selected.dataset.type;
+      });
+      selectEl.dataset.listenerAdded = 'true';
+    }
+
+    // Selecionar primeira opção
+    if (selectEl.options.length > 0) {
+      selectEl.selectedIndex = 0;
+      const firstOpt = selectEl.options[0];
+      document.getElementById('format-type').value = firstOpt.dataset?.type || 'audio';
+    }
+
+    loading.classList.add('d-none');
+    results.classList.remove('d-none');
+
+  } catch (error) {
+    console.error('Erro ao extrair:', error);
+    alert('Erro ao analisar o vídeo: ' + error.message);
+    loading.classList.add('d-none');
+  }
+});
+</script>
+
+{% endblock %}

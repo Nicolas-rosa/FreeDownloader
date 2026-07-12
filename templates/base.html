@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Baixe arquivos MP3 e MP4 próprios, ou autorizados, usando uma URL direta e segura.">
+    <title>{% block title %}FreeDownloader{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg site-nav">
+      <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}"><span class="brand-mark">↓</span> FreeDownloader</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navigation" aria-label="Abrir navegação"><span class="navbar-toggler-icon"></span></button>
+        <div class="collapse navbar-collapse" id="navigation">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}#como-funciona">Como funciona</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('contacts') }}">Contatos</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('terms') }}">Termos</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('privacy') }}">Privacidade</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    {% block content %}{% endblock %}
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <a class="navbar-brand" href="{{ url_for('index') }}"><span class="brand-mark">↓</span> FreeDownloader</a>
+        <p>Downloads simples para arquivos que são seus ou que você está autorizado a usar.</p>
+        <div class="footer-links"><a href="{{ url_for('contacts') }}">Contatos</a><a href="{{ url_for('terms') }}">Termos de uso</a><a href="{{ url_for('privacy') }}">Privacidade</a><a href="{{ url_for('dmca') }}">Direitos autorais</a></div>
+      </div>
+      <div class="container footer-bottom">© {{ 2026 }} FreeDownloader. Todos os direitos reservados.</div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
