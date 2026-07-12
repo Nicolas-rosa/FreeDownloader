@@ -1,0 +1,20 @@
+services:
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider
+    container_name: bgutil-provider
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:4416:4416"
+
+  nginx:
+    image: nginx:alpine
+    container_name: pot-nginx
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      POT_PROVIDER_SECRET: ${POT_PROVIDER_SECRET:?defina POT_PROVIDER_SECRET no ambiente}
+    volumes:
+      - ./default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      - pot-provider
