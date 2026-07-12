@@ -26,7 +26,28 @@ class YouTubeStreamExtractor:
             'socket_timeout': 15,
         }
 
-    def extract_video_info(self, url: str) -> Optional[Dict]:
+    def _build_options(self, extra: Optional[Dict] = None) -> Dict:
+        opts = {
+            **self.ydl_opts,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9',
+            },
+            'geo_bypass': True,
+            'nocheckcertificate': True,
+            'source_address': '0.0.0.0',
+            'retries': 3,
+        }
+        if extra:
+            opts.update(extra)
+        return opts
+
+    def _run_ydl(self, url: str, extra: Optional[Dict] = None) -> Dict:
+        ydl_opts = self._build_options(extra)
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            return ydl.extract_info(url, download=False)
+
+    def extract_video_info(self, url: str) -> Dict:
         """
         Extrai informações de vídeo: título, duração, formatos disponíveis.
 
@@ -34,20 +55,26 @@ class YouTubeStreamExtractor:
             url: URL do YouTube (youtube.com, youtu.be, etc)
 
         Returns:
-            Dicionário com metadados ou None se houver erro
+            Dicionário com metadados ou erro informado
         """
         try:
-            with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                return {
-                    'id': info.get('id'),
-                    'title': info.get('title', 'Vídeo'),
-                    'duration': info.get('duration', 0),
-                    'uploader': info.get('uploader', 'Desconhecido'),
-                    'formats': self._extract_formats(info),
-                }
-        except Exception as e:
-            return None
+            info = self._run_ydl(url)
+        except Exception as first_exc:
+            try:
+                info = self._run_ydl(url, {
+                    'force_generic_extractor': True,
+                    'prefer_insecure': True,
+                })
+            except Exception as second_exc:
+                return {'error': str(second_exc)}
+
+        return {
+            'id': info.get('id'),
+            'title': info.get('title', 'Vídeo'),
+            'duration': info.get('duration', 0),
+            'uploader': info.get('uploader', 'Desconhecido'),
+            'formats': self._extract_formats(info),
+        }
 
     def _extract_formats(self, info: Dict) -> List[Dict]:
         """
@@ -114,15 +141,12 @@ class YouTubeStreamExtractor:
             URL de stream ou None
         """
         try:
-            ydl_opts = {**self.ydl_opts, 'format': format_id}
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if 'url' in info:
-                    return info['url']
-                # Tentar recuperar de formatos
-                for fmt in info.get('formats', []):
-                    if fmt.get('format_id') == format_id and fmt.get('url'):
-                        return fmt['url']
+            info = self._run_ydl(url, {'format': format_id})
+            if info.get('url'):
+                return info['url']
+            for fmt in info.get('formats', []):
+                if fmt.get('format_id') == format_id and fmt.get('url'):
+                    return fmt['url']
         except Exception:
             pass
         return None

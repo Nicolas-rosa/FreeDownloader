@@ -193,10 +193,11 @@ def extract_youtube():
     extractor = get_extractor()
     info = extractor.extract_video_info(url)
 
-    if not info:
+    if not info or info.get('error'):
+        message = info.get('error') if info else 'Não foi possível extrair informações do vídeo. Verifique a URL.'
         return jsonify({
             'success': False,
-            'message': 'Não foi possível extrair informações do vídeo. Verifique a URL.'
+            'message': message
         }), 400
 
     return jsonify({
