@@ -14,6 +14,7 @@ import time
 import base64
 import yt_dlp
 import json
+import logging
 from typing import Dict, List, Optional, Tuple
 
 _CACHE_TTL_SECONDS = 900
@@ -31,28 +32,114 @@ class YouTubeStreamExtractor:
             'extract_flat': False,
             'socket_timeout': 15,
         }
+        # Cookie state tracking (path and validity)
+        self._cookiefile_path: Optional[str] = None
+        self._cookiefile_valid: bool = False
+
+        # Logger for diagnostics (appears in Vercel logs)
+        self._logger = logging.getLogger(__name__)
+        if not logging.getLogger().handlers:
+            # Ensure there is at least a basic handler so logs appear
+            logging.basicConfig(level=logging.INFO)
 
     def _ensure_cookiefile(self) -> Optional[str]:
+        # Reset state
+        self._cookiefile_path = None
+        self._cookiefile_valid = False
+
         cookies_path = os.environ.get('YTDLP_COOKIES_PATH')
         if cookies_path:
-            return cookies_path
+            # Respect explicit path, but validate if possible
+            if os.path.exists(cookies_path):
+                try:
+                    with open(cookies_path, 'rb') as fd:
+                        content = fd.read()
+                    valid = self._validate_cookies_content(content)
+                    self._cookiefile_path = cookies_path if valid else None
+                    self._cookiefile_valid = valid
+                    if not valid:
+                        self._logger.warning('[cookies] Arquivo em YTDLP_COOKIES_PATH não parece um cookies.txt válido do YouTube — ignorando.')
+                    return self._cookiefile_path
+                except Exception as exc:
+                    self._logger.warning('[cookies] Erro ao ler YTDLP_COOKIES_PATH: %s', exc)
+                    return None
+            return None
 
         b64 = os.environ.get('YTDLP_COOKIES_B64')
         if not b64:
             return None
 
         target_path = '/tmp/ytdlp_cookies.txt'
+        # If file already exists, validate it before returning
         if os.path.exists(target_path):
-            return target_path
+            try:
+                with open(target_path, 'rb') as fd:
+                    content = fd.read()
+                valid = self._validate_cookies_content(content)
+                self._cookiefile_path = target_path if valid else None
+                self._cookiefile_valid = valid
+                if not valid:
+                    self._logger.warning('[cookies] Arquivo em %s existe, mas não parece válido — ignorando.', target_path)
+                return self._cookiefile_path
+            except Exception as exc:
+                self._logger.warning('[cookies] Erro ao ler %s: %s', target_path, exc)
+                return None
 
         try:
             decoded = base64.b64decode(b64)
+        except Exception as exc:
+            self._logger.warning('[cookies] Falha ao decodificar YTDLP_COOKIES_B64: %s', exc)
+            return None
+
+        # Validate before writing
+        if not self._validate_cookies_content(decoded):
+            self._logger.warning('[cookies] Arquivo em YTDLP_COOKIES_B64 não parece um cookies.txt válido do YouTube — ignorando.')
+            return None
+
+        try:
             with open(target_path, 'wb') as fd:
                 fd.write(decoded)
+            self._cookiefile_path = target_path
+            self._cookiefile_valid = True
+            try:
+                size = os.path.getsize(target_path)
+            except Exception:
+                size = None
+            self._logger.info('[cookies] Escreveu %s com %s bytes (validação OK).', target_path, size)
             return target_path
         except Exception as exc:
-            print('yt-dlp cookie decode error:', exc)
+            self._logger.warning('[cookies] Erro ao escrever %s: %s', target_path, exc)
             return None
+
+    def _validate_cookies_content(self, content: bytes) -> bool:
+        """Valida de forma simples se bytes representam um cookies.txt do Netscape/yt-dlp.
+
+        Regras básicas:
+        - Começa com header conhecido (# Netscape HTTP Cookie File ou # HTTP Cookie File)
+          OR contém linhas com 7 campos separados por tab.
+        - Contém ao menos uma linha com 'youtube.com' ou '.youtube.com'.
+        """
+        if not content:
+            return False
+        try:
+            text = content.decode('utf-8', errors='replace')
+        except Exception:
+            return False
+
+        stripped = text.lstrip()
+        has_header = stripped.startswith('# Netscape HTTP Cookie File') or stripped.startswith('# HTTP Cookie File')
+
+        lines = [ln for ln in text.splitlines() if ln and not ln.strip().startswith('#')]
+        has_seven_field = False
+        has_youtube = False
+        for ln in lines:
+            if 'youtube.com' in ln:
+                has_youtube = True
+            parts = ln.split('\t')
+            if len(parts) >= 7:
+                has_seven_field = True
+
+        return (has_header or has_seven_field) and has_youtube
 
     def _build_options(self, extra: Optional[Dict] = None) -> Dict:
         opts = {
@@ -70,9 +157,10 @@ class YouTubeStreamExtractor:
         }
 
         cookiefile = self._ensure_cookiefile()
-        if cookiefile:
+        if cookiefile and self._cookiefile_valid:
             opts['cookiefile'] = cookiefile
         else:
+            # Fallback to cookies_from_browser only if set; do not fabricate cookies
             cookies_browser = os.environ.get('YTDLP_COOKIES_FROM_BROWSER')
             if cookies_browser:
                 opts['cookies_from_browser'] = cookies_browser
@@ -111,6 +199,21 @@ class YouTubeStreamExtractor:
         if cached and cached['expires'] > now:
             return cached['value']
 
+        # Diagnostic logs about cookie env and status
+        has_env = bool(os.environ.get('YTDLP_COOKIES_B64') or os.environ.get('YTDLP_COOKIES_PATH'))
+        # Ensure we have evaluated cookiefile path/validity
+        _ = self._ensure_cookiefile()
+        cookie_path = self._cookiefile_path
+        cookie_valid = self._cookiefile_valid
+        cookie_size = None
+        if cookie_path and cookie_valid:
+            try:
+                cookie_size = os.path.getsize(cookie_path)
+            except Exception:
+                cookie_size = None
+        self._logger.info('[cookies] YTDLP_COOKIES_B64 definida: %s; cookiefile: %s; tamanho_bytes: %s; validacao: %s',
+                          has_env, bool(cookie_path), cookie_size, cookie_valid)
+
         client_strategies = [None, 'android', 'ios', 'web_creator']
         errors = []
         info = None
@@ -128,12 +231,21 @@ class YouTubeStreamExtractor:
         if not info:
             error_text = errors[-1][1] if errors else 'Falha desconhecida ao extrair o vídeo.'
             readable_error = error_text.lower()
-            if 'sign in to confirm' in readable_error or 'cookies' in readable_error or 'botguard' in readable_error or 'po token' in readable_error:
-                cookiefile = self._ensure_cookiefile()
-                if cookiefile:
+            # Heurística de bot-check/cookies
+            bot_signals = ['sign in to confirm', 'cookies', 'botguard', 'po token', 'verify you are human']
+            if any(s in readable_error for s in bot_signals):
+                # Differentiate whether we had valid cookies loaded
+                if cookie_path and cookie_valid:
+                    # Cookies were provided and structurally valid — likely expired/flagged
+                    self._logger.warning('[cookies] Detected bot-check while cookies valid: %s', readable_error)
                     return {'error': 'Os cookies do YouTube parecem inválidos ou expiraram. Atualize YTDLP_COOKIES_B64 no Vercel.'}
-                return {'error': 'Este vídeo está temporariamente indisponível para download automático. Tente novamente em alguns minutos ou use outro vídeo.'}
-            print('yt-dlp extraction errors:', errors)
+                else:
+                    # No cookies configured or invalid cookies — inform maintenance logs
+                    self._logger.warning('[cookies] Detected bot-check without valid cookies: %s', readable_error)
+                    return {'error': 'Este vídeo está temporariamente indisponível para download automático. Tente novamente em alguns minutos ou use outro vídeo.'}
+
+            # Other errors: log full error types (without sensitive data)
+            self._logger.info('[yt-dlp] extraction errors: %s', errors)
             return {'error': 'Este vídeo está temporariamente indisponível para download automático. Tente novamente em alguns minutos ou use outro vídeo.'}
 
         result = {
