@@ -10,9 +10,14 @@ Módulo responsável por:
 """
 
 import os
+import time
+import base64
 import yt_dlp
 import json
 from typing import Dict, List, Optional, Tuple
+
+_CACHE_TTL_SECONDS = 900
+_VIDEO_INFO_CACHE: Dict[str, Dict] = {}
 
 
 class YouTubeStreamExtractor:
@@ -27,6 +32,28 @@ class YouTubeStreamExtractor:
             'socket_timeout': 15,
         }
 
+    def _ensure_cookiefile(self) -> Optional[str]:
+        cookies_path = os.environ.get('YTDLP_COOKIES_PATH')
+        if cookies_path:
+            return cookies_path
+
+        b64 = os.environ.get('YTDLP_COOKIES_B64')
+        if not b64:
+            return None
+
+        target_path = '/tmp/ytdlp_cookies.txt'
+        if os.path.exists(target_path):
+            return target_path
+
+        try:
+            decoded = base64.b64decode(b64)
+            with open(target_path, 'wb') as fd:
+                fd.write(decoded)
+            return target_path
+        except Exception as exc:
+            print('yt-dlp cookie decode error:', exc)
+            return None
+
     def _build_options(self, extra: Optional[Dict] = None) -> Dict:
         opts = {
             **self.ydl_opts,
@@ -38,22 +65,29 @@ class YouTubeStreamExtractor:
             'nocheckcertificate': True,
             'source_address': '0.0.0.0',
             'retries': 3,
-            'cachedir': False,
+            'cachedir': '/tmp/ytdlp_cache',
+            'nopart': True,
         }
 
-        cookies_path = os.environ.get('YTDLP_COOKIES_PATH')
-        cookies_browser = os.environ.get('YTDLP_COOKIES_FROM_BROWSER')
-        proxy = os.environ.get('YTDLP_PROXY')
-        if cookies_path:
-            opts['cookiefile'] = cookies_path
-        elif cookies_browser:
-            opts['cookies_from_browser'] = cookies_browser
+        cookiefile = self._ensure_cookiefile()
+        if cookiefile:
+            opts['cookiefile'] = cookiefile
+        else:
+            cookies_browser = os.environ.get('YTDLP_COOKIES_FROM_BROWSER')
+            if cookies_browser:
+                opts['cookies_from_browser'] = cookies_browser
 
+        proxy = os.environ.get('YTDLP_PROXY')
         if proxy:
             opts['proxy'] = proxy
 
         if extra:
+            # Preserve extractor_args if passed explicitly
+            extractor_args = extra.pop('extractor_args', None)
+            if extractor_args:
+                opts['extractor_args'] = extractor_args
             opts.update(extra)
+
         return opts
 
     def _run_ydl(self, url: str, extra: Optional[Dict] = None) -> Dict:
@@ -71,30 +105,46 @@ class YouTubeStreamExtractor:
         Returns:
             Dicionário com metadados ou erro informado
         """
-        try:
-            info = self._run_ydl(url)
-        except Exception as first_exc:
-            try:
-                info = self._run_ydl(url, {
-                    'force_generic_extractor': True,
-                    'prefer_insecure': True,
-                })
-            except Exception as second_exc:
-                error_message = str(second_exc)
-                if 'sign in to confirm' in error_message.lower() or 'cookies' in error_message.lower():
-                    error_message = (
-                        'O YouTube exige autenticação/cookies para este vídeo. ' 
-                        'Configure YTDLP_COOKIES_PATH ou use outro vídeo.'
-                    )
-                return {'error': error_message}
+        cache_key = url.strip()
+        now = time.time()
+        cached = _VIDEO_INFO_CACHE.get(cache_key)
+        if cached and cached['expires'] > now:
+            return cached['value']
 
-        return {
+        client_strategies = [None, 'android', 'ios', 'web_creator']
+        errors = []
+        info = None
+        for client in client_strategies:
+            extra = {}
+            if client:
+                extra['extractor_args'] = {'youtube': {'player_client': [client]}}
+            try:
+                info = self._run_ydl(url, extra)
+                break
+            except Exception as exc:
+                errors.append((client or 'default', str(exc)))
+                continue
+
+        if not info:
+            error_text = errors[-1][1] if errors else 'Falha desconhecida ao extrair o vídeo.'
+            readable_error = error_text.lower()
+            if 'sign in to confirm' in readable_error or 'cookies' in readable_error or 'botguard' in readable_error or 'po token' in readable_error:
+                cookiefile = self._ensure_cookiefile()
+                if cookiefile:
+                    return {'error': 'Os cookies do YouTube parecem inválidos ou expiraram. Atualize YTDLP_COOKIES_B64 no Vercel.'}
+                return {'error': 'Este vídeo está temporariamente indisponível para download automático. Tente novamente em alguns minutos ou use outro vídeo.'}
+            print('yt-dlp extraction errors:', errors)
+            return {'error': 'Este vídeo está temporariamente indisponível para download automático. Tente novamente em alguns minutos ou use outro vídeo.'}
+
+        result = {
             'id': info.get('id'),
             'title': info.get('title', 'Vídeo'),
             'duration': info.get('duration', 0),
             'uploader': info.get('uploader', 'Desconhecido'),
             'formats': self._extract_formats(info),
         }
+        _VIDEO_INFO_CACHE[cache_key] = {'expires': now + _CACHE_TTL_SECONDS, 'value': result}
+        return result
 
     def _extract_formats(self, info: Dict) -> List[Dict]:
         """

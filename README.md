@@ -22,9 +22,14 @@ Notas importantes para aprovação no Google AdSense:
 
 Depuração de YouTube no deploy:
 - Para vídeos que exigem login, use cookies autenticados do navegador.
-- Exporte um `cookies.txt` da conta Google logada e configure em Vercel como `YTDLP_COOKIES_PATH`.
-- Não suba o arquivo de cookies para o Git; use variável de ambiente ou storage seguro.
-- Para proxy residencial, configure `YTDLP_PROXY` no Vercel com algo como `http://user:pass@host:port`.
+- Exporte um `cookies.txt` da conta Google logada e configure em Vercel como `YTDLP_COOKIES_B64`.
+- Converta o arquivo para Base64 antes de copiar para a variável de ambiente:
+  ```bash
+  base64 -w0 cookies.txt
+  ```
+- Não suba o arquivo de cookies para o Git; mantenha-o como variável de ambiente/secret no painel do Vercel.
+- Se necessário, use proxy residencial com `YTDLP_PROXY` no Vercel, por exemplo `http://user:pass@host:port`.
+- Se os cookies expirarem ou perderem validade, gere um novo `cookies.txt` e atualize `YTDLP_COOKIES_B64`.
 
 Observações legais:
 - Este projeto não auxilia em burlar proteções ou TOS de terceiros. Use apenas arquivos que você possui direitos.

@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "*.py": {
+      "memory": 512,
+      "maxDuration": 60
+    },
+    "api/*.py": {
+      "memory": 512,
+      "maxDuration": 60
+    }
+  }
+}
